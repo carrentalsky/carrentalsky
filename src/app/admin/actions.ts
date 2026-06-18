@@ -100,13 +100,18 @@ export async function signInAdmin(formData: FormData) {
 
   const { data: admin, error: adminError } = await supabase
     .from("admin_users")
-    .select("id")
-    .eq("user_id", data.user.id)
+    .select("user_id, email, approved")
+    .eq("user_id", sessionUser.id)
     .eq("approved", true)
     .maybeSingle();
 
-  if (adminError || !admin) {
+  if (adminError) {
     logAdminAuthError("admin approval lookup failed", adminError);
+    await supabase.auth.signOut();
+    redirect("/admin/login?error=not-approved");
+  }
+
+  if (!admin) {
     await supabase.auth.signOut();
     redirect("/admin/login?error=not-approved");
   }
