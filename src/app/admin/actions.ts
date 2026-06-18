@@ -1,6 +1,5 @@
 "use server";
 
-import sharp from "sharp";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
@@ -261,6 +260,7 @@ export async function uploadMedia(formData: FormData) {
     throw new Error("Please choose an image file.");
   }
 
+  const { default: sharp } = await import("sharp");
   const input = Buffer.from(await file.arrayBuffer());
   const source = sharp(input, { failOn: "none" }).rotate();
   const metadata = await source.metadata();
