@@ -1,5 +1,4 @@
 import Image from "next/image";
-import { signInAdmin } from "@/app/admin/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +41,7 @@ export default async function AdminLoginPage({ searchParams }: LoginProps) {
             {errors[error] ?? "Unable to sign in."}
           </div>
         )}
-        <form action={signInAdmin} className="mt-6 grid gap-4">
+        <form action="/admin/auth/login" method="post" className="mt-6 grid gap-4">
           <label className="grid gap-2 text-sm font-bold text-slate-800">
             Email
             <input
