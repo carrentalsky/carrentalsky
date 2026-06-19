@@ -77,6 +77,16 @@ function redirectWithCookies(request: NextRequest, path: string, cookiesToSet: C
   return response;
 }
 
+export async function GET() {
+  return new NextResponse("admin auth login route is deployed", {
+    status: 200,
+    headers: {
+      "content-type": "text/plain; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const cookiesToSet: CookieToSet[] = [];
 

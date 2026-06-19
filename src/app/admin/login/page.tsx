@@ -36,6 +36,9 @@ export default async function AdminLoginPage({ searchParams }: LoginProps) {
         <p className="mt-2 text-sm leading-6 text-slate-600">
           Sign in with a Supabase Auth account that is approved in the admin users table.
         </p>
+        <p className="mt-3 rounded-md bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">
+          Login handler: route-v2
+        </p>
         {error && (
           <div className="mt-5 rounded-md border border-red-200 bg-red-50 p-3 text-sm font-semibold text-red-700">
             {errors[error] ?? "Unable to sign in."}
