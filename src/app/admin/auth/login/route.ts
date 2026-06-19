@@ -1,7 +1,7 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseEnv, getSupabaseUrlHost, hasSupabaseEnv } from "@/lib/env";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { lookupAdminApproval } from "@/lib/admin-approval";
 import type { Database } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -161,8 +161,8 @@ export async function POST(request: NextRequest) {
     setCookieNames: cookiesToSet.map((cookie) => cookie.name),
   });
 
-  const adminSupabase = createSupabaseAdminClient();
-  if (!adminSupabase) {
+  const approvalLookup = await lookupAdminApproval(user.id, user.email);
+  if (!approvalLookup.adminSupabaseAvailable) {
     await supabase.auth.signOut();
     debugLog("service role client missing", {
       userId: user.id,
@@ -173,15 +173,21 @@ export async function POST(request: NextRequest) {
     return redirectWithCookies(request, "/admin/login?error=missing-service-role", cookiesToSet);
   }
 
-  const { data: admin, error: adminError } = await adminSupabase
-    .from("admin_users")
-    .select("user_id, email, approved")
-    .eq("user_id", user.id)
-    .eq("approved", true)
-    .maybeSingle();
+  debugLog("admin approval query executed", {
+    query: approvalLookup.query,
+    rawResult: approvalLookup.matchingAdminRows,
+    rowCount: approvalLookup.approvedRowCount,
+    userIdOnlyRowCount: approvalLookup.userIdOnlyRowCount,
+    emailRowCount: approvalLookup.emailRowCount,
+    approvalExists: approvalLookup.approvalExists,
+    queryError: approvalLookup.queryError,
+    userIdColumnExpectedType: approvalLookup.query.userIdColumnExpectedType,
+    rlsNote: approvalLookup.rlsNote,
+    usesServiceRoleClient: approvalLookup.adminSupabaseAvailable,
+  });
 
-  if (adminError) {
-    debugError("admin approval query failed", adminError);
+  if (approvalLookup.queryError) {
+    debugError("admin approval query failed", approvalLookup.queryError);
     await supabase.auth.signOut();
     debugLog("redirect decision", {
       userId: user.id,
@@ -193,12 +199,15 @@ export async function POST(request: NextRequest) {
     return redirectWithCookies(request, "/admin/login?error=not-approved", cookiesToSet);
   }
 
-  if (!admin) {
+  if (!approvalLookup.approvalExists) {
     await supabase.auth.signOut();
     debugLog("admin approval result", {
       userId: user.id,
       email: user.email,
       approvalExists: false,
+      rawResult: approvalLookup.matchingAdminRows,
+      rowsByUserId: approvalLookup.rowsByUserId,
+      rowsByEmail: approvalLookup.rowsByEmail,
       setCookieNames: cookiesToSet.map((cookie) => cookie.name),
       finalRedirect: "/admin/login?error=not-approved",
     });
@@ -209,6 +218,7 @@ export async function POST(request: NextRequest) {
     userId: user.id,
     email: user.email,
     approvalExists: true,
+    rawResult: approvalLookup.matchingAdminRows,
     setCookieNames: cookiesToSet.map((cookie) => cookie.name),
     finalRedirect: "/admin",
   });

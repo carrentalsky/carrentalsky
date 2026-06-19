@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { lookupAdminApproval } from "@/lib/admin-approval";
 import { getSupabaseUrlHost } from "@/lib/env";
-import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -19,21 +19,12 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = await createSupabaseServerClient();
-  const adminSupabase = createSupabaseAdminClient();
   const authResult = supabase
     ? await supabase.auth.getUser()
     : { data: { user: null }, error: { code: "missing_env", message: "Missing public Supabase env." } };
 
   const user = authResult.data.user;
-  const approvalResult =
-    adminSupabase && user
-      ? await adminSupabase
-          .from("admin_users")
-          .select("user_id, email, approved")
-          .eq("user_id", user.id)
-          .eq("approved", true)
-          .maybeSingle()
-      : { data: null, error: null };
+  const approvalLookup = user ? await lookupAdminApproval(user.id, user.email) : null;
 
   return NextResponse.json({
     enabled: true,
@@ -51,12 +42,7 @@ export async function GET(request: NextRequest) {
           message: authResult.error.message,
         }
       : null,
-    approvalExists: Boolean(approvalResult.data),
-    approvalError: approvalResult.error
-      ? {
-          code: approvalResult.error.code,
-          message: approvalResult.error.message,
-        }
-      : null,
+    approvalExists: approvalLookup?.approvalExists ?? false,
+    approvalError: approvalLookup?.queryError ?? null,
   });
 }
