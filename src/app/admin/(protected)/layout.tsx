@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { signOutAdmin } from "@/app/admin/actions";
 import { requireAdmin } from "@/lib/auth";
 
+export const dynamic = "force-dynamic";
+
 const adminNav = [
   { href: "/admin", label: "Dashboard" },
   { href: "/admin/site-settings", label: "Site Settings" },

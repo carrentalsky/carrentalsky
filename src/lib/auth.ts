@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { getSupabaseUrlHost } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -13,24 +14,40 @@ function logAdminLookupError(error: { message?: string; code?: string } | null |
 
 function logAdminLookupDebug(label: string, details: Record<string, unknown>) {
   if (process.env.ADMIN_LOGIN_DEBUG !== "1") return;
-  console.warn("[admin-auth]", label, details);
+  console.warn("[admin-auth]", label, {
+    supabaseHost: getSupabaseUrlHost(),
+    hasAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    ...details,
+  });
 }
 
 export async function getCurrentAdmin() {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return null;
+  if (!supabase) {
+    logAdminLookupDebug("missing public Supabase env", {});
+    return null;
+  }
 
   const {
     data: { user },
+    error: userError,
   } = await supabase.auth.getUser();
+
+  if (userError) {
+    logAdminLookupDebug("auth.getUser failed", {
+      code: userError.code,
+      message: userError.message,
+    });
+  }
 
   if (!user?.email) return null;
 
   const adminSupabase = createSupabaseAdminClient();
   if (!adminSupabase) {
     logAdminLookupDebug("service role client missing", {
-      hasUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      userId: user.id,
+      email: user.email,
     });
     return null;
   }

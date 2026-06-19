@@ -1,6 +1,8 @@
 import Image from "next/image";
 import { signInAdmin } from "@/app/admin/actions";
 
+export const dynamic = "force-dynamic";
+
 type LoginProps = {
   searchParams: Promise<{ error?: string }>;
 };
@@ -14,6 +16,7 @@ const errors: Record<string, string> = {
     "Supabase accepted the login but the server could not read the new session. Restart the dev server and try again.",
   "not-approved": "This account is not listed as an approved admin.",
   "missing-env": "Supabase environment variables are not configured.",
+  "missing-service-role": "Supabase service role key is missing on the server. Add it to local/Vercel environment variables.",
 };
 
 export default async function AdminLoginPage({ searchParams }: LoginProps) {

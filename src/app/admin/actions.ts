@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
+import { getSupabaseUrlHost } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/types";
@@ -46,7 +47,12 @@ function logAdminAuthError(
 
 function logAdminAuthDebug(label: string, details: Record<string, unknown>) {
   if (process.env.ADMIN_LOGIN_DEBUG !== "1") return;
-  console.warn("[admin-login]", label, details);
+  console.warn("[admin-login]", label, {
+    supabaseHost: getSupabaseUrlHost(),
+    hasAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+    hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+    ...details,
+  });
 }
 
 function classifyAuthError(error: { message?: string; status?: number; code?: string } | null | undefined) {
@@ -82,7 +88,12 @@ async function getAuthedSupabase() {
 
 export async function signInAdmin(formData: FormData) {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) redirect("/admin/login?error=missing-env");
+  if (!supabase) {
+    logAdminAuthDebug("missing public Supabase env", {
+      finalRedirect: "/admin/login?error=missing-env",
+    });
+    redirect("/admin/login?error=missing-env");
+  }
 
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
@@ -101,17 +112,26 @@ export async function signInAdmin(formData: FormData) {
   if (sessionError || !sessionUser || sessionUser.id !== data.user.id) {
     logAdminAuthError("auth.getUser after sign-in failed", sessionError);
     await supabase.auth.signOut();
+    logAdminAuthDebug("session check failed", {
+      finalRedirect: "/admin/login?error=session-check-failed",
+    });
     redirect("/admin/login?error=session-check-failed");
   }
+
+  logAdminAuthDebug("signed-in user resolved", {
+    userId: sessionUser.id,
+    email: sessionUser.email,
+  });
 
   const adminSupabase = createSupabaseAdminClient();
   if (!adminSupabase) {
     logAdminAuthDebug("service role client missing", {
-      hasUrl: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-      hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY),
+      userId: sessionUser.id,
+      email: sessionUser.email,
+      finalRedirect: "/admin/login?error=missing-service-role",
     });
     await supabase.auth.signOut();
-    redirect("/admin/login?error=missing-env");
+    redirect("/admin/login?error=missing-service-role");
   }
 
   const { data: admin, error: adminError } = await adminSupabase
@@ -123,6 +143,12 @@ export async function signInAdmin(formData: FormData) {
 
   if (adminError) {
     logAdminAuthError("admin approval lookup failed", adminError);
+    logAdminAuthDebug("approval query errored", {
+      userId: sessionUser.id,
+      email: sessionUser.email,
+      approvalExists: false,
+      finalRedirect: "/admin/login?error=not-approved",
+    });
     await supabase.auth.signOut();
     redirect("/admin/login?error=not-approved");
   }
@@ -131,10 +157,19 @@ export async function signInAdmin(formData: FormData) {
     logAdminAuthDebug("admin approval row not found", {
       userId: sessionUser.id,
       email: sessionUser.email,
+      approvalExists: false,
+      finalRedirect: "/admin/login?error=not-approved",
     });
     await supabase.auth.signOut();
     redirect("/admin/login?error=not-approved");
   }
+
+  logAdminAuthDebug("admin approval succeeded", {
+    userId: sessionUser.id,
+    email: sessionUser.email,
+    approvalExists: true,
+    finalRedirect: "/admin",
+  });
 
   redirect("/admin");
 }
