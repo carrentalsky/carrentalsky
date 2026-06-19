@@ -29,6 +29,13 @@ export async function updateSession(request: NextRequest) {
     },
   });
 
-  await supabase.auth.getUser();
+  const { error } = await supabase.auth.getUser();
+  if (error && process.env.ADMIN_LOGIN_DEBUG === "1") {
+    console.warn("[supabase-middleware]", "auth.getUser failed", {
+      code: error.code,
+      message: error.message,
+    });
+  }
+
   return response;
 }

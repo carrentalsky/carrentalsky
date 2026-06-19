@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "@/lib/auth";
 import { getSupabaseUrlHost } from "@/lib/env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseActionClient, createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/types";
 import {
   faqSchema,
@@ -87,7 +87,7 @@ async function getAuthedSupabase() {
 }
 
 export async function signInAdmin(formData: FormData) {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionClient();
   if (!supabase) {
     logAdminAuthDebug("missing public Supabase env", {
       finalRedirect: "/admin/login?error=missing-env",
@@ -103,6 +103,11 @@ export async function signInAdmin(formData: FormData) {
     logAdminAuthError("signInWithPassword failed", error);
     redirect(`/admin/login?error=${classifyAuthError(error)}`);
   }
+
+  logAdminAuthDebug("signInWithPassword succeeded", {
+    userId: data.user.id,
+    email: data.user.email,
+  });
 
   const {
     data: { user: sessionUser },
@@ -175,7 +180,7 @@ export async function signInAdmin(formData: FormData) {
 }
 
 export async function signOutAdmin() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseActionClient();
   await supabase?.auth.signOut();
   redirect("/admin/login");
 }

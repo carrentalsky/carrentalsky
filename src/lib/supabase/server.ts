@@ -28,3 +28,25 @@ export async function createSupabaseServerClient() {
     },
   });
 }
+
+export async function createSupabaseActionClient() {
+  if (!hasSupabaseEnv()) {
+    return null;
+  }
+
+  const { url, anonKey } = getSupabaseEnv();
+  const cookieStore = await cookies();
+
+  return createServerClient<Database>(url, anonKey, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value, options }) => {
+          cookieStore.set(name, value, options);
+        });
+      },
+    },
+  });
+}
